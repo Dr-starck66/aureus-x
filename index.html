@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#121713" />
+  <title>AUREUS-X — Deep Archive Treasure Intelligence</title>
+  <meta name="description" content="Moteur cartographique de recherche géohistorique : archives, manuscrits, livres anciens, légendes et indices géospatiaux." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,650&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">AX</div>
+        <div>
+          <div class="eyebrow">MYTHOS ASTRA Ω · EVIDENCE-FIRST</div>
+          <h1>AUREUS-X</h1>
+        </div>
+      </div>
+      <div class="status-line">
+        <span class="status-dot"></span>
+        <span id="mapEngineLabel">Initialisation cartographique…</span>
+      </div>
+    </header>
+
+    <section class="command-panel">
+      <div class="command-head">
+        <div>
+          <div class="eyebrow">MISSION</div>
+          <h2>Rechercher profondément. Cartographier clairement.</h2>
+        </div>
+        <div class="engine-badges" aria-label="Sources activées">
+          <span>Gallica</span><span>BnF</span><span>Internet Archive</span><span>Wikisource</span>
+        </div>
+      </div>
+
+      <form id="searchForm" class="search-grid">
+        <label class="field span-2">
+          <span>Sujet libre</span>
+          <input id="subjectInput" name="subject" value="trésors cachés, dépôts monétaires, caches de guerre" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Ville / territoire</span>
+          <input id="cityInput" name="city" value="Perpignan" autocomplete="address-level2" required />
+        </label>
+        <label class="field">
+          <span>Période</span>
+          <select id="periodInput" name="period">
+            <option value="all">Toutes périodes → 1960</option>
+            <option value="ancient">Antiquité</option>
+            <option value="medieval">Moyen Âge</option>
+            <option value="modern">1500–1789</option>
+            <option value="revolution">1789–1870</option>
+            <option value="industrial">1870–1914</option>
+            <option value="ww1">1914–1918</option>
+            <option value="interwar">1919–1938</option>
+            <option value="ww2">1939–1945</option>
+            <option value="postwar">1946–1960</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Rayon</span>
+          <select id="radiusInput" name="radius">
+            <option value="5">5 km</option>
+            <option value="10" selected>10 km</option>
+            <option value="25">25 km</option>
+            <option value="50">50 km</option>
+          </select>
+        </label>
+        <button id="runButton" class="primary-btn" type="submit">
+          <span class="btn-icon">⌖</span>
+          <span>Lancer DEEP ARCHIVES-X</span>
+        </button>
+      </form>
+
+      <div class="query-examples" id="queryExamples">
+        <button type="button" data-query="trésor wisigothique, monnaies, butin" data-city="Narbonne">Wisigoths · Narbonne</button>
+        <button type="button" data-query="cache de guerre, or, bijoux, exode" data-city="Perpignan">1936–1945 · Perpignan</button>
+        <button type="button" data-query="monastère disparu, reliques, trésor ecclésiastique" data-city="Carcassonne">Monastères · Carcassonne</button>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="map-pane">
+        <div class="map-toolbar">
+          <div class="legend">
+            <span><i class="pin strong"></i> Fortement corroboré</span>
+            <span><i class="pin medium"></i> Corroboré</span>
+            <span><i class="pin trace"></i> Piste documentaire</span>
+            <span><i class="pin legend-pin"></i> Légende</span>
+          </div>
+          <div class="map-actions">
+            <button id="satelliteButton" type="button">Satellite</button>
+            <button id="roadButton" type="button">Plan</button>
+          </div>
+        </div>
+        <div id="map" aria-label="Carte des candidats AUREUS-X"></div>
+        <div id="mapFallbackBanner" class="map-banner hidden"></div>
+      </section>
+
+      <aside class="intel-pane">
+        <div class="intel-head">
+          <div>
+            <div class="eyebrow">CANDIDATS</div>
+            <h3 id="resultTitle">Aucune mission lancée</h3>
+          </div>
+          <span id="resultCount" class="count-pill">0</span>
+        </div>
+
+        <div id="progressPanel" class="progress-panel hidden" aria-live="polite">
+          <div class="scanner-line"></div>
+          <p id="progressText">Interrogation des archives…</p>
+        </div>
+
+        <div id="candidateList" class="candidate-list empty-state">
+          <div class="empty-glyph">⌖</div>
+          <p>Lance une mission. Les candidats documentés apparaîtront ici et sur la carte.</p>
+        </div>
+      </aside>
+    </main>
+
+    <section class="evidence-section">
+      <div class="section-title-row">
+        <div>
+          <div class="eyebrow">DEEP ARCHIVES-X</div>
+          <h2>Sources primaires et traces documentaires</h2>
+        </div>
+        <div id="sourceStats" class="source-stats">0 document analysé</div>
+      </div>
+      <div id="evidenceGrid" class="evidence-grid">
+        <div class="evidence-placeholder">Les manuscrits, ouvrages, notices, chroniques et textes trouvés seront listés ici avec leur provenance.</div>
+      </div>
+    </section>
+
+    <footer>
+      <span>AUREUS-X v0.1 · classement probabiliste fondé sur des sources explicites</span>
+      <span>Une hypothèse n’est jamais présentée comme un fait sans preuve.</span>
+    </footer>
+  </div>
+
+  <dialog id="candidateDialog" class="candidate-dialog">
+    <button class="dialog-close" id="dialogClose" aria-label="Fermer">×</button>
+    <div id="dialogContent"></div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
