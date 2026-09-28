@@ -86,7 +86,7 @@ function renderCandidates(candidates){
   list.innerHTML=candidates.map(c=>{ const k=kindInfo(c.kind); return `
     <article class="candidate-card" data-id="${esc(c.id)}">
       <div class="card-top"><div><div class="eyebrow">${esc(c.place.split(',')[0])}</div><h4>${esc(c.treasureDescription)}</h4></div><div class="score">${c.score}</div></div>
-      <div class="candidate-meta"><span class="tag ${k.cls}">${esc(k.label)}</span><span class="tag">${c.evidence?.length||0} preuve(s)</span></div>
+      <div class="candidate-meta"><span class="tag ${k.cls}">${esc(k.label)}</span><span class="tag">${c.evidence?.length||0} notice(s) filtrée(s)</span></div>
       <p class="why-preview"><strong>Pourquoi ici ?</strong> ${esc(c.whyHere?.[0]||'Convergence documentaire')}</p>
       <button class="open-candidate" type="button" data-open="${esc(c.id)}">Ouvrir la fiche complète</button>
     </article>`}).join('');
@@ -133,7 +133,7 @@ async function runMission(){
     const q=new URLSearchParams({city,subject,lat:String(geo.lat),lng:String(geo.lng),period:$('#periodInput').value,radius:$('#radiusInput').value});
     const r=await fetch('/api/research?'+q); const j=await r.json(); if(!r.ok) throw new Error(j.error||'Erreur de recherche');
     state.candidates=j.candidates||[]; state.documents=j.documents||[]; clearMarkers(); state.candidates.forEach(addCandidateMarker); renderCandidates(state.candidates); renderDocuments(state.documents);
-    $('#resultTitle').textContent=`${city} · ${subject}`; $('#resultCount').textContent=String(state.candidates.length); $('#sourceStats').textContent=`${j.documentCount||0} documents · ${j.sourcesQueried||0} sources interrogées`;
+    $('#resultTitle').textContent=`${city} · ${subject}`; $('#resultCount').textContent=String(state.candidates.length); $('#sourceStats').textContent=`${j.documentCount||0} documents retenus · ${j.rejectedDocumentCount||0} rejetés · ${j.sourcesQueried||0} sources interrogées`;
     if(j.errors?.length){ $('#sourceStats').textContent += ` · ${j.errors.length} source(s) momentanément indisponible(s)`; }
     if(state.candidates[0]) focusCandidate(state.candidates[0]);
   }catch(e){ $('#candidateList').className='candidate-list'; $('#candidateList').innerHTML=`<div class="empty-state"><div class="empty-glyph">!</div><p>${esc(e.message)}</p></div>`; }
