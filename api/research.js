@@ -1,8 +1,33 @@
 const TREASURE_TERMS = [
-  'trésor','tresor','cache','caché','cachee','enfoui','enfouie','dépôt','depot','monnaies','numéraire','numeraire','cassette','coffre','or','argent','bijoux','reliques','butin','magot',
-  'tesoro','enterrado','oculto','monedas','cofre','oro','plata','joias','tresaur','amagat','monedes','cofre',
-  'thesaurus','aurum','argentum','pecunia','arca','depositum','absconditus'
+  'trésor','tresor','cache monétaire','cache monetaire','enfoui','enfouie','enfouissement',
+  'dépôt monétaire','depot monetaire','monnaie','monnaies','numéraire','numeraire','numismatique',
+  'denier','deniers','aureus','statère','statere','statères','stateres','solidus','solidi',
+  'écu','ecu','écus','ecus','florin','florins','louis d or','coffre','cassette','butin','magot',
+  'trouvaille monétaire','trouvaille monetaire','découverte monétaire','decouverte monetaire',
+  'coin hoard','hoard','buried treasure','tesoro','monedas','thesaurus','pecunia','depositum','absconditus'
 ];
+
+const NUMISMATIC_ANCHORS = [
+  'monnaie','monnaies','numéraire','numeraire','numismatique','numismatics','coin','coins',
+  'denier','deniers','aureus','statère','statere','statères','stateres','solidus','solidi',
+  'écu','ecu','écus','ecus','florin','florins','louis d or','médaille','medaille','médailles'
+];
+
+const DEPOSIT_ANCHORS = [
+  'trésor','tresor','dépôt monétaire','depot monetaire','cache monétaire','cache monetaire',
+  'trouvaille monétaire','trouvaille monetaire','découverte monétaire','decouverte monetaire',
+  'enfoui','enfouie','enfouissement','hoard','coin hoard','buried treasure','tesoro'
+];
+
+const ARCHAEO_ANCHORS = [
+  'archéologie','archeologie','archéologique','archeologique','fouille','fouilles',
+  'inventaire numismatique','catalogue numismatique','dépôt votif','depot votif'
+];
+
+const SUBJECT_STOPWORDS = new Set([
+  'avec','dans','pour','sur','des','les','une','aux','par','the','and','treasure',
+  'trésor','tresor','enfoui','enfouie','depot','dépôt','monnaie','monnaies','archive','archives'
+]);
 
 function stripTags(s='') { return s.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim(); }
 function decodeXml(s='') { return stripTags(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&apos;/g,"'"); }
@@ -13,6 +38,39 @@ function values(block, tag) {
 function first(block, tag) { return values(block,tag)[0] || ''; }
 function arkFromIdentifiers(ids=[]) { return ids.find(x=>/gallica\.bnf\.fr\/ark:\/12148\//i.test(x)) || ''; }
 function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
+
+function normalizeForMatch(value=''){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/[’']/g,' ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function phraseHit(hay, needle){
+  const h=' '+normalizeForMatch(hay)+' ';
+  const n=' '+normalizeForMatch(needle)+' ';
+  return n.trim().length>0 && h.includes(n);
+}
+function countPhraseHits(hay, terms){ return terms.reduce((n,t)=>n+(phraseHit(hay,t)?1:0),0); }
+function subjectTokens(subject){
+  return [...new Set(normalizeForMatch(subject).split(' ').filter(t=>t.length>=4 && !SUBJECT_STOPWORDS.has(t)))];
+}
+function assessDocumentRelevance(d, city, subject){
+  const title=d.title||'', description=d.description||'', coverage=d.coverage||'';
+  const combined=`${title} ${description} ${coverage}`;
+  const coverageCity=phraseHit(coverage,city), titleCity=phraseHit(title,city), descCity=phraseHit(description,city);
+  const geographicScore=coverageCity?100:titleCity?80:descCity?55:0;
+  const numismaticHits=countPhraseHits(combined,NUMISMATIC_ANCHORS);
+  const depositHits=countPhraseHits(combined,DEPOSIT_ANCHORS);
+  const archaeoHits=countPhraseHits(combined,ARCHAEO_ANCHORS);
+  const strongAnchorHits=numismaticHits+depositHits;
+  const thematicScore=clamp(strongAnchorHits*28+archaeoHits*12,0,100);
+  const tokens=subjectTokens(subject);
+  const subjectHits=tokens.filter(t=>phraseHit(combined,t)).length;
+  const subjectScore=tokens.length?Math.round(subjectHits/tokens.length*100):50;
+  const oldDate=/\b(1[0-8]\d{2}|19[0-5]\d)\b/.test(d.date||'');
+  let score=Math.round(geographicScore*.35+thematicScore*.45+subjectScore*.15+(oldDate?5:0));
+  const eligible=geographicScore>=55 && strongAnchorHits>=1 && thematicScore>=28;
+  if(!eligible) score=Math.min(score,39);
+  return {eligible,score:clamp(score,0,95),geographicScore,thematicScore,subjectScore};
+}
 
 async function gallicaSearch(city, subject, max=15) {
   const q = `(${`gallica all "${city.replaceAll('"','')}"`}) and (${`gallica any "${subject.replaceAll('"','')} ${TREASURE_TERMS.slice(0,16).join(' ')}"`})`;
@@ -56,7 +114,7 @@ async function bnfSearch(city, subject, max=12) {
 
 async function internetArchiveSearch(city, subject, max=10) {
   const u=new URL('https://archive.org/advancedsearch.php');
-  u.searchParams.set('q',`(${city}) AND (${subject} OR treasure OR trésor OR cache OR hoard OR buried)`);
+  u.searchParams.set('q',`mediatype:texts AND (\"${city.replaceAll('"','')}\") AND (${subject.replaceAll('"','')} OR monnaie OR monnaies OR numismatique OR trésor OR \"dépôt monétaire\" OR hoard)`);
   ['identifier','title','creator','date','description','subject','coverage','language'].forEach(f=>u.searchParams.append('fl[]',f));
   u.searchParams.set('rows',String(max)); u.searchParams.set('page','1'); u.searchParams.set('output','json');
   const r=await fetch(u,{headers:{'User-Agent':'AUREUS-X/0.1'}}); if(!r.ok) throw new Error(`Internet Archive ${r.status}`);
@@ -73,7 +131,7 @@ async function wikisourceSearch(city, subject, max=8) {
   u.searchParams.set('action','query'); u.searchParams.set('list','search'); u.searchParams.set('srsearch',`${city} ${subject} trésor cache enfoui`); u.searchParams.set('srlimit',String(max)); u.searchParams.set('format','json'); u.searchParams.set('origin','*');
   const r=await fetch(u,{headers:{'User-Agent':'AUREUS-X/0.1'}}); if(!r.ok) throw new Error(`Wikisource ${r.status}`);
   const j=await r.json();
-  return (j.query?.search||[]).map(x=>({id:`ws-${x.pageid}`,source:'Wikisource',sourceType:'texte ancien',title:x.title,creator:'',date:'',description:stripTags(x.snippet||''),coverage:city,url:`https://fr.wikisource.org/?curid=${x.pageid}`,evidenceLevel:'text'}));
+  return (j.query?.search||[]).map(x=>({id:`ws-${x.pageid}`,source:'Wikisource',sourceType:'texte ancien',title:x.title,creator:'',date:'',description:stripTags(x.snippet||''),coverage:'',url:`https://fr.wikisource.org/?curid=${x.pageid}`,evidenceLevel:'text'}));
 }
 
 async function geocodePlace(q, near) {
@@ -85,15 +143,7 @@ async function geocodePlace(q, near) {
   return {lat:Number(j[0].lat),lng:Number(j[0].lon),name:j[0].display_name};
 }
 
-function scoreDoc(d, city, subject){
-  const hay=`${d.title} ${d.description} ${d.coverage}`.toLowerCase();
-  const cityHit=hay.includes(city.toLowerCase());
-  const subjWords=subject.toLowerCase().split(/\s+/).filter(x=>x.length>2);
-  const subjHits=subjWords.filter(w=>hay.includes(w)).length;
-  const treasureHits=TREASURE_TERMS.filter(w=>hay.includes(w.toLowerCase())).length;
-  const oldDate=/\b(1[0-8]\d{2}|19[0-5]\d)\b/.test(d.date||'');
-  return clamp(20+(cityHit?18:0)+Math.min(18,subjHits*6)+Math.min(30,treasureHits*8)+(oldDate?8:0),10,94);
-}
+function scoreDoc(d, city, subject){ return assessDocumentRelevance(d,city,subject).score; }
 
 function candidateKind(score, sourceCount, legendish){
   if(sourceCount>=3 && score>=80) return 'fortement_corrobore';
@@ -118,7 +168,13 @@ export default async function handler(req,res){
   if(!city) return res.status(400).json({error:'city requis'});
   const tasks=[gallicaSearch(city,subject),bnfSearch(city,subject),internetArchiveSearch(city,subject),wikisourceSearch(city,subject)];
   const settled=await Promise.allSettled(tasks);
-  const docs=settled.flatMap(x=>x.status==='fulfilled'?x.value:[]).map(d=>({...d,score:scoreDoc(d,city,subject)}));
+  const rawDocs=settled.flatMap(x=>x.status==='fulfilled'?x.value:[]);
+  const seen=new Set();
+  const docs=rawDocs
+    .map(d=>{ const a=assessDocumentRelevance(d,city,subject); return {...d,score:a.score,_relevance:a}; })
+    .filter(d=>d._relevance.eligible)
+    .filter(d=>{ const k=(d.ark||d.url||d.id||d.title).toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; });
+  const rejectedDocumentCount=rawDocs.length-docs.length;
   const errors=settled.map((x,i)=>x.status==='rejected'?['Gallica','BnF','Internet Archive','Wikisource'][i]+': '+x.reason?.message:null).filter(Boolean);
 
   // Group records into geocodable evidence clusters. Coverage fields are preferred because they are explicit source metadata.
@@ -131,7 +187,7 @@ export default async function handler(req,res){
   }
   const ranked=[...groups.values()].map(g=>({
     ...g,
-    score:Math.round(g.docs.reduce((a,d)=>a+d.score,0)/g.docs.length + Math.min(12,(g.docs.length-1)*4)),
+    score:Math.round(g.docs.reduce((a,d)=>a+d.score,0)/g.docs.length + Math.min(8,(new Set(g.docs.map(d=>d.source)).size-1)*4)),
     sourceCount:new Set(g.docs.map(d=>d.source)).size
   })).sort((a,b)=>b.score-a.score).slice(0,8);
 
@@ -139,7 +195,6 @@ export default async function handler(req,res){
   for(const g of ranked){
     let geo=null;
     try { geo=await geocodePlace(g.place===city?city:`${g.place}, ${city}`, center); } catch {}
-    if(!geo && center) geo={...center,name:city};
     if(!geo) continue;
     const top=g.docs.slice().sort((a,b)=>b.score-a.score)[0];
     const legendish=/légend|legende|folklore|tradition|conte|mythe/i.test(g.docs.map(d=>`${d.title} ${d.description}`).join(' '));
@@ -159,5 +214,5 @@ export default async function handler(req,res){
   }
 
   res.setHeader('Cache-Control','s-maxage=900, stale-while-revalidate=86400');
-  return res.status(200).json({city,subject,generatedAt:new Date().toISOString(),sourcesQueried:4,documentCount:docs.length,candidates,documents:docs.slice(0,40),errors});
+  return res.status(200).json({city,subject,generatedAt:new Date().toISOString(),sourcesQueried:4,documentCount:docs.length,rejectedDocumentCount,candidates,documents:docs.slice(0,40),errors,methodology:{relevanceGate:'place+explicit-thematic-anchor',bareSubstringOr:false}});
 }
