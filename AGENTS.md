@@ -1,0 +1,7 @@
+# ASTRA CONSIGNES Ω — aureus-x
+
+Instruction persistante du propriétaire : avant toute proposition ou implémentation, charger les directives dans `Dr-starck66/indexation/config/astra-consignes.json` et lire `Dr-starck66/indexation/AGENTS.md` ; garde exécutable : `tools/astra-consignes/cli.mjs` dans le dépôt central. Si inaccessible, conserver les règles ci-dessous et signaler uniquement l'absence de preuve de synchronisation.
+
+**RÈGLES INVIOLABLES** : coût additionnel 0€ et aucune nouvelle tâche programmée (consolider dans les batches existants); préserver chaque projet et ses décisions explicites; aucune répétition inutile demandée à l'utilisateur. Pour chaque site éditorial de production, publier **3 vrais nouveaux articles minimum PAR JOUR ET PAR SITE** (news factuelles d'abord, evergreen original sinon) avec preuve par URL; cette règle n'impose pas d'article aux apps non éditoriales. Aucun PASS sans preuves séparées tests, SHA, runtime/HTTPS, vrai contenu, images et SEO; ne jamais assimiler publication à visibilité Google Discover. Double Triple Check et preuves indépendantes, ni faux données ni mocks. WINE ELSE couvre TOUTE L'OCCITANIE. Ne jamais casser données, anciens URL, DNS ou emails.
+
+Toute nouvelle demande doit être conciliée avec les directives précédentes sans silencieusement réduire les objectifs. Si une nouvelle instruction explicite remplace un objectif, la versionner. Ce fichier assure la découverte documentaire par les agents ; l'exécution des contrôles dans les pipelines reste à vérifier indépendamment.
